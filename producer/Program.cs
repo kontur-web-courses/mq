@@ -1,9 +1,21 @@
+using MassTransit;
+using producer;
+
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
-
+builder.Services.AddScoped<MyPublisher>();
+builder.Services.AddMassTransit(config =>
+{
+    config.UsingRabbitMq((context, cfg) => { 
+        cfg.Host("localhost", "/", h => { 
+            h.Username("guest");
+            h.Password("guest");
+        });
+    });
+});
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
@@ -19,8 +31,9 @@ var summaries = new[]
     "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"
 };
 
-app.MapGet("/weatherforecast", () =>
+app.MapGet("/weatherforecast", async (MyPublisher publisher) =>
 {
+    await publisher.Publish("Weather endpoint was called");
     var forecast =  Enumerable.Range(1, 5).Select(index =>
         new WeatherForecast
         (
