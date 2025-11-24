@@ -1,8 +1,20 @@
+using MassTransit;
+using producer.Brokers.RabbitMq;
+
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
-// Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
+
+builder.Services.AddMassTransit(config =>
+{
+    config.UsingRabbitMq((context, cfg) => {
+        cfg.Host("localhost", 5673, "/", h => {
+            h.Username("guest");
+            h.Password("guest");
+        });
+    });
+});
+builder.Services.AddTransient<MyRabbitMqPublisher>();
 
 var app = builder.Build();
 
@@ -12,14 +24,12 @@ if (app.Environment.IsDevelopment())
     app.MapOpenApi();
 }
 
-app.UseHttpsRedirection();
-
 var summaries = new[]
 {
     "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"
 };
 
-app.MapGet("/weatherforecast", () =>
+app.MapGet("/weatherforecast", async (MyRabbitMqPublisher publisher) =>
 {
     var forecast =  Enumerable.Range(1, 5).Select(index =>
         new WeatherForecast
@@ -29,6 +39,11 @@ app.MapGet("/weatherforecast", () =>
             summaries[Random.Shared.Next(summaries.Length)]
         ))
         .ToArray();
+
+    await publisher.Publish("Forecast created!");
+
+    Console.WriteLine("Sent.");
+
     return forecast;
 })
 .WithName("GetWeatherForecast");
