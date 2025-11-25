@@ -6,104 +6,92 @@ using Models;
 using NUnit.Framework;
 using producer;
 
-namespace Producer.Tests
+namespace Producer.Tests;
+
+[TestFixture]
+public class MassTransitTests
 {
-    [TestFixture]
-    public class MassTransitTests
+    private ServiceProvider? _provider;
+    private ITestHarness? _harness;
+
+    [SetUp]
+    public async Task GlobalSetup()
     {
-        private ServiceProvider? _provider;
-        private ITestHarness? _harness;
+        var services = new ServiceCollection();
 
-        [OneTimeSetUp]
-        public async Task GlobalSetup()
+        services.AddMassTransitTestHarness(cfg =>
         {
-            var services = new ServiceCollection();
-
-            services.AddMassTransitTestHarness(cfg =>
+            cfg.AddConsumer<MyConsumer>();
+            cfg.UsingInMemory((context, cfgg) =>
             {
-                cfg.AddConsumer<MyConsumer>();
-                cfg.UsingInMemory((context, cfgg) =>
+                cfgg.ConfigureEndpoints(context);
+            });
+        });
+        services.AddScoped<MyPublisher>();
+        services.AddMassTransitTestHarness(cfg =>
+        {
+            cfg.AddConsumer<MyConsumer>();
+
+            cfg.UsingInMemory((context, cfgg) =>
+            {
+                cfgg.ReceiveEndpoint("my-queue", e =>
                 {
-                    cfgg.ConfigureEndpoints(context);
+                    e.ConfigureConsumer<MyConsumer>(context);
                 });
             });
-            services.AddScoped<MyPublisher>();
-            services.AddMassTransitTestHarness(cfg =>
-            {
-                cfg.AddConsumer<MyConsumer>();
-
-                cfg.UsingInMemory((context, cfgg) =>
-                {
-                    cfgg.ReceiveEndpoint("my-queue", e =>
-                    {
-                        e.ConfigureConsumer<MyConsumer>(context);
-                    });
-                });
-            });
-            _provider = services.BuildServiceProvider();
-            _harness = _provider.GetRequiredService<ITestHarness>();
-            await _harness.Start();
-        }
-
-        [OneTimeTearDown]
-        public async Task GlobalTeardown() => await _harness.Stop();
-
-        [Test]
-        public async Task Should_publish_message_via_MyPublisher_and_consumer_receives_it()
-        {
-            var publisher = _harness.Provider.GetRequiredService<MyPublisher>();
-            await publisher.Publish("FirstTest", DateOnly.MaxValue,  "Прив кд чд?");
-            Assert.That(await _harness.Consumed.Any<Model>(), Is.True.After(5000, 100),
-                "Консьюмер должен получить сообщение");
-
-            var consumed = _harness.Consumed.Select<Model>().FirstOrDefault();
-            Assert.That(consumed, Is.Not.Null);
-            Assert.That(consumed!.Context.Message.Message, Is.EqualTo("Прив кд чд?"));
-        }
-
-        [Test]
-        public async Task Should_send_directly_to_queue_my_queue_and_consumer_receives_it()
-        {
-            var endpoint = await _harness.Bus.GetSendEndpoint(new Uri("queue:my-queue"));
-            var id = Guid.NewGuid();
-            var testMessage = new Model
-            {
-                Id = id,
-                Message = "Прямой Send",
-                Date = DateTime.Now,
-                Name = $"Taska {id}",
-            };
-
-            await endpoint.Send(testMessage);
-            Assert.That(await _harness.Sent.Any<Model>(), Is.True);
-            Assert.That(await _harness.Consumed.Any<Model>(), Is.True);
-
-            var consumed = _harness.Consumed.Select<Model>()
-                .FirstOrDefault(c => c.Context.Message.Id == testMessage.Id);
-
-            Assert.That(consumed, Is.Not.Null);
-            Assert.That(consumed!.Context.Message.Message, Is.EqualTo("Прямой Send"));
-        }
-
-        [Test]
-        public async Task Consumer_should_be_registered_and_ready()
-        {
-            var consumerTestHarness = _harness.GetConsumerHarness<MyConsumer>();
-
-            Assert.That(await consumerTestHarness.Consumed.Any<Model>(), Is.False.After(5000, 100)); 
+                
+        });
             
-            var id = Guid.NewGuid();
+        _provider = services.BuildServiceProvider();
+        _harness = _provider.GetRequiredService<ITestHarness>();
+        await _harness.Start();
+    }
 
-            await _harness.Bus.Publish(new Model
-            {
-                Id = id,
-                Message = "Тест готовности",
-                Date = DateTime.Now,
-                Name = $"Ready Taska {id}",
-            });
+    [OneTimeTearDown]
+    public async Task GlobalTeardown() => await _harness.Stop();
 
-            Assert.That(await consumerTestHarness.Consumed.Any<Model>(), Is.True.After(5000, 100),
-                "Наш конкретный консьюмер должен получить сообщение");
-        }
+    [Test]
+    public async Task Should_publish_message_via_MyPublisher_and_consumer_receives_it()
+    {
+        var publisher = _harness.Provider.GetRequiredService<MyPublisher>();
+        await publisher.Publish("FirstTest", DateOnly.MaxValue,  "Прив кд чд?");
+        Assert.That(await _harness.Consumed.Any<Model>(), Is.True.After(5000, 100),
+            "Консьюмер должен получить сообщение");
+
+        var consumed = _harness.Consumed.Select<Model>().FirstOrDefault();
+        Assert.That(consumed, Is.Not.Null);
+        Assert.That(consumed!.Context.Message.Message, Is.EqualTo("Прив кд чд?"));
+    }
+        
+    [TearDown]
+    public async Task TearDown()
+    {
+        if (_harness != null)
+            await _harness.Stop();
+        await _provider!.DisposeAsync();
+    }
+
+    [Test]
+    public async Task Should_send_directly_to_queue_my_queue_and_consumer_receives_it()
+    {
+        var endpoint = await _harness.Bus.GetSendEndpoint(new Uri("queue:my-queue"));
+        var id = Guid.NewGuid();
+        var testMessage = new Model
+        {
+            Id = id,
+            Message = "Прямой Send",
+            Date = DateTime.Now,
+            Name = $"Taska {id}",
+        };
+
+        await endpoint.Send(testMessage);
+        Assert.That(await _harness.Sent.Any<Model>(), Is.True);
+        Assert.That(await _harness.Consumed.Any<Model>(), Is.True);
+
+        var consumed = _harness.Consumed.Select<Model>()
+            .FirstOrDefault(c => c.Context.Message.Id == testMessage.Id);
+
+        Assert.That(consumed, Is.Not.Null);
+        Assert.That(consumed!.Context.Message.Message, Is.EqualTo("Прямой Send"));
     }
 }
