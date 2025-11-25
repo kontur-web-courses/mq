@@ -44,7 +44,7 @@ app.MapGet("/weatherforecast", async (OrderPublisher publisher) =>
             summaries[Random.Shared.Next(summaries.Length)]
         ))
         .ToArray();
-    
+
     await publisher.Publish("Test Customer", Random.Shared.Next(100, 10000));
     
     return forecast;
