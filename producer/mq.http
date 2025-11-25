@@ -1,6 +1,4 @@
-@mq_HostAddress = http://localhost:5289
-
-GET {{mq_HostAddress}}/weatherforecast/
+GET http://localhost:5289/weatherforecast/
 Accept: application/json
 
 ###
