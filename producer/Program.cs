@@ -1,4 +1,5 @@
 using MassTransit;
+using Microsoft.AspNetCore.Mvc;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -30,7 +31,8 @@ var summaries = new[]
     "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"
 };
 
-app.MapGet("/weatherforecast", async (MyPublisher publisher) =>
+
+app.MapGet("/weatherforecast", async ([FromServices] MyPublisher publisher) =>
 {
     var forecast =  Enumerable.Range(1, 5).Select(index =>
             new WeatherForecast
