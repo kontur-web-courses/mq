@@ -8,6 +8,8 @@ builder.Services.AddOpenApi();
 
 builder.Services.AddMassTransit(config =>
 {
+    config.AddConsumer<MyConsumer>();
+    
     config.UsingRabbitMq((context, cfg) => { 
         cfg.Host("localhost", "/", h => { 
             h.Username("guest");
@@ -17,7 +19,7 @@ builder.Services.AddMassTransit(config =>
         cfg.ReceiveEndpoint("my-queue", e =>
         {
             e.UseInMemoryOutbox(context);
-            e.Consumer<MyConsumer>();
+            e.ConfigureConsumer<MyConsumer>(context);
         });
     });
 });
