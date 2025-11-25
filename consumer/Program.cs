@@ -1,41 +1,55 @@
-var builder = WebApplication.CreateBuilder(args);
+using MassTransit;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 
-// Add services to the container.
-// Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
-builder.Services.AddOpenApi();
+namespace consumer;
 
-var app = builder.Build();
-
-// Configure the HTTP request pipeline.
-if (app.Environment.IsDevelopment())
+public static class Program
 {
-    app.MapOpenApi();
-}
+	public static async Task Main(string[] args)
+	{
+		var builder = CreateHostBuilder(args);
 
-app.UseHttpsRedirection();
+		var host = builder.Build();
 
-var summaries = new[]
-{
-    "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"
-};
+		var busControl = host.Services.GetRequiredService<IBusControl>();
 
-app.MapGet("/weatherforecast", () =>
-{
-    var forecast =  Enumerable.Range(1, 5).Select(index =>
-        new WeatherForecast
-        (
-            DateOnly.FromDateTime(DateTime.Now.AddDays(index)),
-            Random.Shared.Next(-20, 55),
-            summaries[Random.Shared.Next(summaries.Length)]
-        ))
-        .ToArray();
-    return forecast;
-})
-.WithName("GetWeatherForecast");
+		try
+		{
+			Console.WriteLine("Starting consumer...");
+			await busControl.StartAsync();
+			Console.WriteLine("Consumer started. Press Enter to stop.");
+			Console.ReadLine();
+		}
+		finally
+		{
+			Console.WriteLine("Stopping consumer...");
+			await busControl.StopAsync();
+			Console.WriteLine("Consumer stopped.");
+		}
+	}
 
-app.Run();
+	private static IHostBuilder CreateHostBuilder(string[] args) => Host.CreateDefaultBuilder(args)
+		.ConfigureServices((hostContext, services) =>
+		{
+			services.AddMassTransit(config =>
+			{
+				config.AddConsumer<OrderExecutor>();
 
-record WeatherForecast(DateOnly Date, int TemperatureC, string? Summary)
-{
-    public int TemperatureF => 32 + (int)(TemperatureC / 0.5556);
+				config.UsingRabbitMq((context, cfg) =>
+				{
+					cfg.Host("localhost", "/", h =>
+					{
+						h.Username("guest");
+						h.Password("guest");
+					});
+
+					cfg.ReceiveEndpoint("my-queue", e =>
+					{
+						e.UseInMemoryOutbox(context);
+						e.ConfigureConsumer<OrderExecutor>(context);
+					});
+				});
+			});
+		});
 }
