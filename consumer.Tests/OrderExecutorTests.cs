@@ -8,6 +8,7 @@ using Models;
 namespace consumer.Tests;
 
 [TestFixture]
+[Parallelizable(ParallelScope.All)]
 public class OrderExecutorTests
 {
 	[Test]
