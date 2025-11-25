@@ -1,3 +1,4 @@
+using consumer;
 using MassTransit;
 
 
@@ -6,6 +7,22 @@ var builder = WebApplication.CreateBuilder(args);
 // Add services to the container.
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
+
+builder.Services.AddMassTransit(config =>
+{
+    config.UsingRabbitMq((context, cfg) => { 
+        cfg.Host("localhost", "/", h => { 
+            h.Username("guest");
+            h.Password("guest");
+        });
+
+        cfg.ReceiveEndpoint("my-queue", e =>
+        {
+            e.UseInMemoryOutbox(context);
+            e.Consumer<MyConsumer>();
+        });
+    });
+});
 
 var app = builder.Build();
 
