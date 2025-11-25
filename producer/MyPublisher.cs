@@ -12,9 +12,11 @@ public class MyPublisher
         _sendEndpointProvider = sendEndpointProvider;
     }
 
-    public async Task Publish(string content)
+    public async Task Publish(string name, DateOnly date, string content)
     {
         var publishEndpoint = await _sendEndpointProvider.GetSendEndpoint(new Uri("queue:my-queue"));
-        await publishEndpoint.Send(new Model { Id = Guid.NewGuid(), Message = content });
+        var datetime = date.ToDateTime(TimeOnly.MinValue);
+        await publishEndpoint
+            .Send(new Model { Id = Guid.NewGuid(), Name = name, Date = datetime, Message = content });
     }
 }

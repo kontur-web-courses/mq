@@ -45,7 +45,9 @@ app.MapGet("/weatherforecast", (MyPublisher publisher) =>
                 summaries[Random.Shared.Next(summaries.Length)]
             );
 
-            _ = publisher.Publish(forecast.Summary ?? "");
+            var message = forecast.Summary + 
+                          ", temperatureC: " + forecast.TemperatureC + ", temperatureF: " + forecast.TemperatureF;
+            _ = publisher.Publish("Forecast", forecast.Date, message);
             return forecast;
         })
         .ToArray();
