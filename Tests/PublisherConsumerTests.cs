@@ -27,12 +27,15 @@ public class PublisherConsumerTests
         await harness.Start();
 
         var publisher = provider.GetRequiredService<MyPublisher>();
-        await publisher.Publish("Hello world");
+        const string content = "some content";
+        await publisher.Publish(content);
 
         Assert.True(await harness.Sent.Any<MyMessage>());
         Assert.True(await harness.Consumed.Any<MyMessage>());
         
         var consumerHarness = harness.GetConsumerHarness<MyConsumer>();
-        Assert.True(await consumerHarness.Consumed.Any<MyMessage>());
+        var consumed = await consumerHarness.Consumed.SelectAsync<MyMessage>().FirstOrDefault();
+        Assert.NotNull(consumed);
+        Assert.Equal(content, consumed.Context.Message.Content);
     }
 }
