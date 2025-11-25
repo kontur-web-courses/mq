@@ -1,8 +1,21 @@
+using MassTransit;
+using producer;
+
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
+builder.Services.AddMassTransit(config =>
+{
+    config.UsingRabbitMq((context, cfg) => { 
+        cfg.Host("localhost", "/", h => { 
+            h.Username("guest");
+            h.Password("guest");
+        });
+    });
+});
+builder.Services.AddScoped<MyPublisher>();
 
 var app = builder.Build();
 
@@ -19,7 +32,7 @@ var summaries = new[]
     "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"
 };
 
-app.MapGet("/weatherforecast", () =>
+app.MapGet("/weatherforecast", async () =>
 {
     var forecast =  Enumerable.Range(1, 5).Select(index =>
         new WeatherForecast
@@ -29,6 +42,12 @@ app.MapGet("/weatherforecast", () =>
             summaries[Random.Shared.Next(summaries.Length)]
         ))
         .ToArray();
+
+    using var scope = app.Services.CreateScope();
+    var publisher = scope.ServiceProvider.GetRequiredService<MyPublisher>();
+    await publisher.Publish("qwerty");
+
+
     return forecast;
 })
 .WithName("GetWeatherForecast");
