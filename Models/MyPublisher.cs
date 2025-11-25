@@ -1,4 +1,6 @@
-﻿public class MyPublisher
+﻿using MassTransit;
+
+public class MyPublisher
 {
     private readonly ISendEndpointProvider _sendEndpointProvider;
 
