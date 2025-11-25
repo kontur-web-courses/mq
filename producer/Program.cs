@@ -44,8 +44,8 @@ app.MapGet("/weatherforecast", async (MyPublisher publisher) =>
             summaries[Random.Shared.Next(summaries.Length)]
         ))
         .ToArray();
-    await publisher.Publish(
-        string.Join(' ', forecast.Select(f => $"{f.Date} {f.TemperatureC} {f.TemperatureF}")));
+    await publisher.Publish(string.Join('\n', forecast.Select((f, i) => 
+        $"Weather forecast #{i+1} Date: {f.Date} C: {f.TemperatureC} F: {f.TemperatureF}")));
     return forecast;
 })
 .WithName("GetWeatherForecast");
